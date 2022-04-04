@@ -11,28 +11,29 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from random import shuffle
+from sklearn import preprocessing
 
-dataset_root = r'C:\Other Projects\open_cv_htr\dataset'
+dataset_root = r'/home/dakan/Documents/Computer Vision/cv-htr/dataset/'
 
 IMG_SIZE = 128
-DATA_SIZE = 50000
-
+DATA_SIZE = 1000
 
 # fixme change this method
 def create_data():
     data = load_data()
-    shuffle(data)  # randomly order data
-    # data manipulation
-    # image_data = data[0]
-    # training_image_data = image_data[0:len(image_data) * 0.9]
-    # testing_image_data = image_data[len(image_data) * 0.9: len(image_data) * 0.1]
+    # shuffle(data)  # randomly order data
 
-    # label_data = data[1]
-    # training_label_data = label_data[0:len(label_data) * 0.9]
-    # testing_label_data = label_data[len(label_data) * 0.9: len(label_data) * 0.1]
+    X = data[0]
+    y = data[1]
 
-    return train_test_split(data[0],
-                            data[1],
+    #lebel encoder
+    le = preprocessing.LabelEncoder()
+    le.fit(y)
+    y = le.transform(y)
+
+    #output
+    return train_test_split(X,
+                            y,
                             train_size=0.9,
                             test_size=0.1,
                             random_state=123)
@@ -40,70 +41,50 @@ def create_data():
 
 def load_data():
     print('Loading dataset')
-    file_dir_names, class_names = load_annotation()
-    print('Loading images')
-    output = []
+    # first row of list {'name': '827_015_005.jpg', 'description': 'сату'}
+    ann_list = load_annotation() #load dicts in list with img path and label
 
-    # class_name_labels = {class_name: i for i, class_name in enumerate(class_names)}
-    class_name_labels = {}
-    for i in range(len(class_names)):
-        class_name_labels[i] = class_names[i]
-        pass
+    print('Loading images')
+
+    if DATA_SIZE != -1:
+        ann_list = ann_list[:DATA_SIZE]
+    # output = []
+
     images, labels = [], []
 
     broke_image_count = 0
-    work_count = 0
 
-    dataframe = dataset_root + r'\HK_dataset\simple_img'
+    img_path = dataset_root + 'HK_dataset/img'
+    total_sum = len(ann_list)
+    for ann_dict in tqdm(ann_list):
+        label = ann_dict['description']
+        img_link = f"{img_path}/{ann_dict['name']}"
+        try:
+            img = cv2.imread(img_link, cv2.IMREAD_COLOR)
+            img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+            images.append(img)
+            labels.append(label)
+        except cv2.error as e:
+            broke_image_count += 1
 
-    total_sum = 0
-    for (dirpath, dirnames, filenames) in os.walk(dataframe):
-        size_count = 0
-        total_sum = len(filenames)
-        for file in tqdm(filenames):
-            label = class_name_labels[work_count]
-            file = dirpath + r'\{}'.format(file)
-            img_path = os.path.join(dataframe, file)
-            if DATA_SIZE == -1 or size_count < DATA_SIZE:
-                try:
-                    img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-                    if img is not None:
-                        img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-                        images.append(img)
-                        labels.append(label)
-                except cv2.error as e:
-                    broke_image_count += 1
-                work_count += 1
-            else:
-                break
-            pass
-        pass
-
-    print("Work image: {}".format(work_count))
-    print("Broke image: {}".format(total_sum - work_count))
+    print("Work image: {}".format(total_sum - broke_image_count))
+    print("Broke image: {}".format(broke_image_count))
 
     print("Dataset: {}".format(len(images)))
     print("Labels: {}".format(len(labels)))
 
     return [np.array(images, dtype=np.float32),
             np.array(labels, dtype=np.str)]
-    pass
 
 
 def load_annotation():
-    print('Loading annotation from json')
-    ann_path = dataset_root + r'\HK_dataset\simple_ann'
+    ann_path = dataset_root + 'HK_dataset/ann'
+    ann_json_list = os.listdir(ann_path)
 
-    dataframes = []
-    file_names = []
-    for (dir_path, dir_names, filenames) in os.walk(ann_path):
-        size_count = 0
-        for filename in tqdm(filenames):
-            if DATA_SIZE == -1 or size_count < DATA_SIZE:
-                f = open(dir_path + r'\{}'.format(filename), encoding="utf8")
-                file_names.append(filename)
-                dataframes.append(json.load(f)['description'])
-            else:
-                break
-        break
-    return file_names, dataframes
+    ann = []
+    for file_name in tqdm(ann_json_list):
+        path = ann_path + '/' + file_name
+        with open(path) as file:
+            ann.append(json.load(file))
+
+    return ann
