@@ -10,7 +10,10 @@ import ocr
 import resnet as rs
 import preprocessing
 
-root_path = r'C:\Other Projects\open_cv_htr\dataset'
+import tensorflow as tf
+print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+
+root_path = r'/home/dakan/Documents/Computer Vision/cv-htr/dataset/'
 
 
 def show_final_history(history):
@@ -35,13 +38,10 @@ def main():
     training_image_data, testing_image_data, \
     training_label_data, testing_label_data = preprocessing.create_data()
 
-    # rs.resnet(training_image_data, training_label_data,
-    #           testing_image_data, testing_label_data)
-
-    model = rs.ResNet(input_shape=(128, 128, 3), classes=8)
+    model = rs.ResNet(input_shape=(128, 128, 3), num_classes=8)
     # opt = SGD(lr=0.01, momentum=0.7)
     opt = keras.optimizers.Adam(learning_rate=0.01)
-    model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     checkpoint = ModelCheckpoint("model_weights.h5", monitor='val_accuracy', verbose=1,
                                  save_best_only=True, mode='max')
@@ -65,7 +65,6 @@ def main():
                         validation_data=(testing_image_data, testing_label_data))
 
     show_final_history(history)
-    pass
 
 
 def test_data():
