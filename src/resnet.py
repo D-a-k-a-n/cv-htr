@@ -20,6 +20,7 @@ batch_size = [16, 32, 64]  # batch size options for hyperparam tuning
 image_dir = r'C:\Other Projects\open_cv_htr\dataset\HK_dataset'  # location
 
 
+
 # def create_image_label(train_data, test_data):
 #     """ deepnote
 #     Images are now:
@@ -174,7 +175,7 @@ def convolutional_block(X, f, filters, stage, block, s=2):
     pass
 
 
-def ResNet(input_shape, classes):
+def ResNet(input_shape, num_classes):
     model = Sequential()
 
     pre_model = keras.applications.ResNet50(
@@ -182,12 +183,12 @@ def ResNet(input_shape, classes):
         include_top=False,
         weights="imagenet",
         pooling="avg",
-        classes=5,
+        classes=num_classes,
     )
 
     model.add(pre_model)
     model.add(Flatten())
     model.add(Dense(512, activation='relu'))
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(6000, activation='softmax'))
 
     return model
