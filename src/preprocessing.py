@@ -1,9 +1,3 @@
-"""
-Data presented in 5 different folders, one for each class ~800 images per folderA
-function creates two .npy files containing image data and labels with roughly even distribution of flower types in each
-train = 90%, test = 10%
-combines into single list containing 2 arrays. [0] = image data, [1] = one hot encoded class label
-"""
 import json
 import os
 import cv2
@@ -12,11 +6,14 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from random import shuffle
 from sklearn import preprocessing
+from keras.preprocessing.image import ImageDataGenerator
+# from sklearn.preprocessing import LabelBinarizer
 
 dataset_root = r'/home/dakan/Documents/Computer Vision/cv-htr/dataset/'
 
-IMG_SIZE = 128
-DATA_SIZE = 1000
+IMG_SIZE = 32
+DATA_SIZE = 10000
+BS = 128 #batch size
 
 # fixme change this method
 def create_data():
@@ -26,18 +23,46 @@ def create_data():
     X = data[0]
     y = data[1]
 
+    aug = ImageDataGenerator(
+            rotation_range=10,
+            zoom_range=0.05,
+            width_shift_range=0.1,
+            height_shift_range=0.1,
+            shear_range=0.15,
+            horizontal_flip=False,
+            fill_mode="nearest")
+
     #lebel encoder
-    le = preprocessing.LabelEncoder()
-    le.fit(y)
-    y = le.transform(y)
+    le = preprocessing.LabelBinarizer()
+    # le.fit(y)
+    y = le.fit_transform(y)
+
+    # account for skew in the labeled data
+
+    classTotals = y.sum(axis=0)
+    classWeight = {}
+
+    # loop over all classes and calculate the class weight
+    for i in range(0, len(classTotals)):
+      classWeight[i] = classTotals.max() / classTotals[i]
+
+
+
+
+    training_image_data, testing_image_data, \
+    training_label_data, testing_label_data = train_test_split(X,y,
+                                                               train_size=0.8,
+                                                               test_size=0.2,
+                                                               random_state=123)
+
+    # training_image_data = aug.flow(x=training_image_data, y=training_label_data, batch_size=BS)
+    # testing_image_data = aug.flow(x=testing_image_data, y=testing_label_data, batch_size=BS)
+
+    # exit()
 
     #output
-    return train_test_split(X,
-                            y,
-                            train_size=0.9,
-                            test_size=0.1,
-                            random_state=123)
-
+    return le, classWeight, (training_image_data, testing_image_data,
+                            training_label_data, testing_label_data)
 
 def load_data():
     print('Loading dataset')
@@ -45,6 +70,12 @@ def load_data():
     ann_list = load_annotation() #load dicts in list with img path and label
 
     print('Loading images')
+    #
+    # train_datagen = ImageDataGenerator(zoom_range=0.15,width_shift_range=0.2,height_shift_range=0.2,shear_range=0.15)
+    # # test_datagen = ImageDataGenerator()
+    #
+    # train_generator = train_datagen.flow_from_directory(f"{dataset_root}/HK_dataset/img",target_size=(224, 224),batch_size=32,shuffle=True,class_mode='categorical')
+    # # test_generator = test_datagen.flow_from_directory("/content/gdrive/My Drive/datasets/test",target_size=(224,224),batch_size=32,shuffle=False,class_mode='binary')
 
     if DATA_SIZE != -1:
         ann_list = ann_list[:DATA_SIZE]
@@ -60,8 +91,9 @@ def load_data():
         label = ann_dict['description']
         img_link = f"{img_path}/{ann_dict['name']}"
         try:
-            img = cv2.imread(img_link, cv2.IMREAD_COLOR)
+            img = cv2.imread(img_link, 0)
             img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+            img = img.reshape(32, 32, 1)
             images.append(img)
             labels.append(label)
         except cv2.error as e:
